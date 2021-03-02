@@ -21,17 +21,25 @@
 #include <linux/uaccess.h>
 
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("Timer driver");
-#define DEVICE_NAME "xilaxitimer"
-#define DRIVER_NAME "xilaxitimer"
+MODULE_DESCRIPTION("pwm driver");
+#define DEVICE_NAME "pwm"
+#define DRIVER_NAME "pwm_driver"
 //#define IRQ_NUM		164
 
 #define XIL_AXI_TIMER_BASEADDR 0x42800000
 #define XIL_AXI_TIMER_HIGHADDR 0x4280FFFF
 
-#define XIL_AXI_TIMER_TCSR_OFFSET		0x0
-#define XIL_AXI_TIMER_TLR_OFFSET		0x4
-#define XIL_AXI_TIMER_TCR_OFFSET		0x8
+#define XIL_AXI_TIMER_TCSR0_OFFSET		0x0
+#define XIL_AXI_TIMER_TCSR1_OFFSET		0x10
+
+#define XIL_AXI_TIMER_TLR0_OFFSET		0x4
+#define XIL_AXI_TIMER_TLR1_OFFSET		0x14
+
+#define XIL_AXI_TIMER_TCR0_OFFSET		0x8
+#define XIL_AXI_TIMER_TCR1_OFFSET		0x18
+
+
+
 #define XIL_AXI_TIMER_CSR_INT_OCCURED_MASK	0x00000100
 
 #define XIL_AXI_TIMER_CSR_CASC_MASK		0x00000800
@@ -47,54 +55,54 @@ MODULE_DESCRIPTION("Timer driver");
 #define XIL_AXI_TIMER_CSR_DOWN_COUNT_MASK	0x00000002
 #define XIL_AXI_TIMER_CSR_CAPTURE_MODE_MASK	0x00000001
 
-#define TIMER_CNT	0xF8000000
+//#define TIMER_CNT	0xF8000000
 //*************************************************************************
-static int timer_probe(struct platform_device *pdev);
-static int timer_open(struct inode *i, struct file *f);
-static int timer_close(struct inode *i, struct file *f);
-static ssize_t timer_read(struct file *f, char __user *buf, size_t len, loff_t *off);
-static ssize_t timer_write(struct file *f, const char __user *buf, size_t count,
+static int pwm_probe(struct platform_device *pdev);
+static int pwm_open(struct inode *i, struct file *f);
+static int pwm_close(struct inode *i, struct file *f);
+static ssize_t pwm_read(struct file *f, char __user *buf, size_t len, loff_t *off);
+static ssize_t pwm_write(struct file *f, const char __user *buf, size_t count,
                          loff_t *off);
-static int __init timer_init(void);
-static void __exit timer_exit(void);
-static int timer_remove(struct platform_device *pdev);
+static int __init pwm_init(void);
+static void __exit pwm_exit(void);
+static int pwm_remove(struct platform_device *pdev);
 
 
 static char chToUpper(char ch);
 static unsigned long strToInt(const char* pStr, int len, int base);
-static void setup_and_start_timer(unsigned int milliseconds);
+static void setup_and_start_timer(unsigned int period, unsigned int high_time);
 
 //*********************GLOBAL VARIABLES*************************************
-static struct file_operations timer_fops =
+static struct file_operations pwm_fops =
   {
     .owner = THIS_MODULE,
-    .open = timer_open,
-    .release = timer_close,
-    .read = timer_read,
-    .write = timer_write
+    .open = pwm_open,
+    .release = pwm_close,
+    .read = pwm_read,
+    .write = pwm_write
   };
 static struct of_device_id timer_of_match[] = {
   { .compatible = "xlnx,xps-timer-1.00.a", },
   { /* end of list */ },
 };
-static struct platform_driver timer_driver = {
+static struct platform_driver pwm_driver = {
   .driver = {
     .name = DRIVER_NAME,
     .owner = THIS_MODULE,
     .of_match_table	= timer_of_match,
   },
-  .probe		= timer_probe,
-  .remove	= timer_remove,
+  .probe		= pwm_probe,
+  .remove	= pwm_remove,
 };
 
-struct timer_info {
+struct pwm_info {
   unsigned long mem_start;
   unsigned long mem_end;
   void __iomem *base_addr;
   int irq_num;
 };
 
-static struct timer_info *tp = NULL;
+static struct pwm_info *tp = NULL;
 
 MODULE_DEVICE_TABLE(of, timer_of_match);
 
@@ -102,11 +110,11 @@ MODULE_DEVICE_TABLE(of, timer_of_match);
 static struct cdev c_dev;
 static dev_t first;
 static struct class *cl;
-static int int_cnt;
+
 
 //***************************************************
 // INTERRUPT SERVICE ROUTINE (HANDLER)
-
+/*
 static irqreturn_t xilaxitimer_isr(int irq,void*dev_id)		
 {      
   unsigned int data;
@@ -127,22 +135,14 @@ static irqreturn_t xilaxitimer_isr(int irq,void*dev_id)
   /* 
    * Disable Timer after 100 Interrupts
    */
-  int_cnt++;
-  
-  if (int_cnt>=20)
-    {
-      printk("xilaxitimer_isr: all of the interrupts have occurred. Disabling timer");
-      data = ioread32(tp->base_addr + XIL_AXI_TIMER_TCSR_OFFSET);
-      iowrite32(data & ~(XIL_AXI_TIMER_CSR_ENABLE_TMR_MASK), tp->base_addr + XIL_AXI_TIMER_TCSR_OFFSET);
-    }
-  
+
   return IRQ_HANDLED;
 }
-
+*/
 //***************************************************
 // PROBE AND REMOVE
 
-static int timer_probe(struct platform_device *pdev)
+static int pwm_probe(struct platform_device *pdev)
 {
   struct resource *r_mem;
   int rc = 0;
@@ -153,7 +153,7 @@ static int timer_probe(struct platform_device *pdev)
     printk(KERN_ALERT "invalid address\n");
     return -ENODEV;
   }
-  tp = (struct timer_info *) kmalloc(sizeof(struct timer_info), GFP_KERNEL);
+  tp = (struct pwm_info *) kmalloc(sizeof(struct pwm_info), GFP_KERNEL);
   if (!tp) {
     printk(KERN_ALERT "Cound not allocate timer device\n");
     return -ENOMEM;
@@ -170,7 +170,7 @@ static int timer_probe(struct platform_device *pdev)
     goto error1;
   }
   else {
-    printk(KERN_INFO "xilaxitimer_init: Successfully allocated memory region for timer\n");
+    printk(KERN_INFO "xilaxitimer_init: Successfully allocated memory region for pwm\n");
   }
   /* 
    * Map Physical address to Virtual address
@@ -193,8 +193,9 @@ static int timer_probe(struct platform_device *pdev)
   else {
     printk(KERN_INFO "xilaxitimer_init: Registered IRQ %d\n", tp->irq_num);
   }
-  // starting timer, default tick is 1 ms
-  setup_and_start_timer(1000);
+  // starting pwm, default tick is 1s and 50% high time 
+
+  setup_and_start_timer(1000000,500000);
   printk("probing done");
  error2:
   release_mem_region(tp->mem_start, tp->mem_end - tp->mem_start + 1);
@@ -209,9 +210,15 @@ static int timer_remove(struct platform_device *pdev)
     /* 
    * Exit Device Module
    */
-  data = ioread32(tp->base_addr + XIL_AXI_TIMER_TCSR_OFFSET);
+
+  data = ioread32(tp->base_addr + XIL_AXI_TIMER_TCSR0_OFFSET);
   iowrite32(data & ~(XIL_AXI_TIMER_CSR_ENABLE_TMR_MASK),
-            tp->base_addr + XIL_AXI_TIMER_TCSR_OFFSET);
+            tp->base_addr + XIL_AXI_TIMER_TCSR0_OFFSET);
+  
+  data = ioread32(tp->base_addr + XIL_AXI_TIMER_TCSR1_OFFSET);
+  iowrite32(data & ~(XIL_AXI_TIMER_CSR_ENABLE_TMR_MASK),
+            tp->base_addr + XIL_AXI_TIMER_TCSR1_OFFSET);
+
   iounmap(tp->base_addr);
   release_mem_region(tp->mem_start, tp->mem_end - tp->mem_start + 1);
   free_irq(tp->irq_num, NULL);
@@ -221,26 +228,26 @@ static int timer_remove(struct platform_device *pdev)
 //***************************************************
 // IMPLEMENTATION OF FILE OPERATION FUNCTIONS
 
-static int timer_open(struct inode *i, struct file *f)
+static int pwm_open(struct inode *i, struct file *f)
 {
   printk("opening done");
   return 0;
 }
-static int timer_close(struct inode *i, struct file *f)
+static int pwm_close(struct inode *i, struct file *f)
 {
     printk("closing done");
     return 0;
 }
-static ssize_t timer_read(struct file *f, char __user *buf, size_t len, loff_t *off)
+static ssize_t pwm_read(struct file *f, char __user *buf, size_t len, loff_t *off)
 {
     printk("reding entered");
     return 0;
 }
-static ssize_t timer_write(struct file *f, const char __user *buf, size_t count,
+static ssize_t pwm_write(struct file *f, const char __user *buf, size_t count,
                            loff_t *off)
 {
   char buffer[count];
-  unsigned int timer_ms;
+  unsigned int period, high_time;
   int i = 0;
   printk("writing enetered");
   i = copy_from_user(buffer, buf, count);
@@ -251,7 +258,7 @@ static ssize_t timer_write(struct file *f, const char __user *buf, size_t count,
     printk("maximum period exceeded, enter something less than 40000 ");
     return count;
   }
-  setup_and_start_timer(timer_ms);
+  setup_and_start_timer(period,high_time);
   
   
   return count;
@@ -303,46 +310,72 @@ static unsigned long strToInt(const char* pStr, int len, int base)
 //HELPER FUNCTION THAT RESETS AND STARTS TIMER WITH PERIOD IN MILISECONDS
 
 
-static void setup_and_start_timer(unsigned int milliseconds)
+static void setup_and_start_timer(unsigned int period, unsigned int high_time)
 {
   /* 
    * disable Timer Counter
    */
-  unsigned int timer_load;
+  unsigned int timer_load,ht_load;
   unsigned int zero = 0;
   unsigned int data;
-  timer_load = zero - milliseconds*100000;
-  data = ioread32(tp->base_addr + XIL_AXI_TIMER_TCSR_OFFSET);
+ 
+  timer_load = zero - period*100;
+  ht_load = zero - high_time*100;
+
+  data = ioread32(tp->base_addr + XIL_AXI_TIMER_TCSR0_OFFSET);
   iowrite32(data & ~(XIL_AXI_TIMER_CSR_ENABLE_TMR_MASK),
-            tp->base_addr + XIL_AXI_TIMER_TCSR_OFFSET);
-    /* 
+            tp->base_addr + XIL_AXI_TIMER_TCSR0_OFFSET);
+  data = ioread32(tp->base_addr + XIL_AXI_TIMER_TCSR1_OFFSET);
+  iowrite32(data & ~(XIL_AXI_TIMER_CSR_ENABLE_TMR_MASK),
+            tp->base_addr + XIL_AXI_TIMER_TCSR1_OFFSET);
+ 
+
+
+   /* 
    * Set Timer Counter
    */
-  iowrite32(timer_load, tp->base_addr + XIL_AXI_TIMER_TLR_OFFSET);
-  data = ioread32(tp->base_addr + XIL_AXI_TIMER_TLR_OFFSET);
-  printk("xilaxitimer_init: Set timer count 0x%08X\n",data);
+
+  iowrite32(pwm_load, tp->base_addr + XIL_AXI_TIMER_TLR0_OFFSET);
+  data = ioread32(tp->base_addr + XIL_AXI_TIMER_TLR0_OFFSET);
+  printk("xilaxitimer_init: Set period 0x%08X\n",data);
+ 
+  iowrite32(pwm_load, tp->base_addr + XIL_AXI_TIMER_TLR1_OFFSET);
+  data = ioread32(tp->base_addr + XIL_AXI_TIMER_TLR1_OFFSET);
+  printk("xilaxitimer_init: Set high time 0x%08X\n",data);
   
   /* 
-   * Set Timer mode and enable interrupt
+   * Set Timer mode and dont enable interrupt
    */
   iowrite32(XIL_AXI_TIMER_CSR_LOAD_MASK,
-	    tp->base_addr + XIL_AXI_TIMER_TCSR_OFFSET);
-  iowrite32(XIL_AXI_TIMER_CSR_ENABLE_INT_MASK | XIL_AXI_TIMER_CSR_AUTO_RELOAD_MASK,
-	    tp->base_addr + XIL_AXI_TIMER_TCSR_OFFSET);
+	    tp->base_addr + XIL_AXI_TIMER_TCSR0_OFFSET);
+  iowrite32(XIL_AXI_TIMER_CSR_LOAD_MASK,
+	    tp->base_addr + XIL_AXI_TIMER_TCSR1_OFFSET);
+
+  iowrite32(XIL_AXI_TIMER_CSR_EXT_GENERATE_MASK | XIL_AXI_TIMER_CSR_AUTO_RELOAD_MASK | 
+	     XIL_AXI_TIMER_CSR_ENABLE_PWM_MASK,
+	    tp->base_addr + XIL_AXI_TIMER_TCSR0_OFFSET);
+  iowrite32(XIL_AXI_TIMER_CSR_EXT_GENERATE_MASK | XIL_AXI_TIMER_CSR_AUTO_RELOAD_MASK | 
+	     XIL_AXI_TIMER_CSR_ENABLE_PWM_MASK,
+	    tp->base_addr + XIL_AXI_TIMER_TCSR1_OFFSET);
+
 
   /* 
    * Start Timer
    */
-  data = ioread32(tp->base_addr + XIL_AXI_TIMER_TCSR_OFFSET);
+  data = ioread32(tp->base_addr + XIL_AXI_TIMER_TCSR0_OFFSET);
   iowrite32(data | XIL_AXI_TIMER_CSR_ENABLE_TMR_MASK,
-	    tp->base_addr + XIL_AXI_TIMER_TCSR_OFFSET);
+	    tp->base_addr + XIL_AXI_TIMER_TCSR0_OFFSET);
+  data = ioread32(tp->base_addr + XIL_AXI_TIMER_TCSR1_OFFSET);
+  iowrite32(data | XIL_AXI_TIMER_CSR_ENABLE_TMR_MASK,
+	    tp->base_addr + XIL_AXI_TIMER_TCSR1_OFFSET);
+
 
 }
 
 //***************************************************
 // INIT AND EXIT FUNCTIONS OF DRIVER
 
-static int __init timer_init(void)
+static int __init pwm_init(void)
 {
   
   int_cnt = 0;
@@ -362,14 +395,14 @@ static int __init timer_init(void)
     goto fail_0;
   }
   printk(KERN_INFO "Succ class chardev1 create!.\n");
-  if (device_create(cl, NULL, MKDEV(MAJOR(first),0), NULL, "timer") == NULL)
+  if (device_create(cl, NULL, MKDEV(MAJOR(first),0), NULL, "pwm") == NULL)
   {
     goto fail_1;
   }
 
   printk(KERN_INFO "Device created.\n");
 
-  cdev_init(&c_dev, &timer_fops);
+  cdev_init(&c_dev, &pwm_fops);
   if (cdev_add(&c_dev, first, 1) == -1)
   {
     goto fail_2;
@@ -377,7 +410,7 @@ static int __init timer_init(void)
 
   printk(KERN_INFO "Device init.\n");
 
-  return platform_driver_register(&timer_driver);
+  return platform_driver_register(&pwm_driver);
 
  fail_2:
   device_destroy(cl, MKDEV(MAJOR(first),0));
@@ -392,12 +425,12 @@ static int __init timer_init(void)
 static void __exit timer_exit(void)  		
 {
 
-  platform_driver_unregister(&timer_driver);
+  platform_driver_unregister(&pwm_driver);
   cdev_del(&c_dev);
   device_destroy(cl, MKDEV(MAJOR(first),0));
   class_destroy(cl);
   unregister_chrdev_region(first, 1);
-  printk(KERN_ALERT "timer exit.\n");
+  printk(KERN_ALERT "pwm exit.\n");
 
   printk(KERN_INFO "xilaxitimer_exit: Exit Device Module \"%s\".\n", DEVICE_NAME);
 }
