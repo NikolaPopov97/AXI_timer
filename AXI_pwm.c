@@ -112,7 +112,7 @@ static dev_t first;
 static struct class *cl;
 
 static unsigned int period, high_time;
-
+static int on=0;
 //***************************************************
 // INTERRUPT SERVICE ROUTINE (HANDLER)
 
@@ -196,9 +196,9 @@ static int pwm_probe(struct platform_device *pdev)
   }
   // starting pwm, default tick is 1s and 50% high time 
 
-  period = 1000000;
-  high_time = 500000;
-  setup_and_start_timer();
+//  period = 1000000;
+ // high_time = 500000;
+ // setup_and_start_timer();
   printk("probing done");
  error2:
   release_mem_region(tp->mem_start, tp->mem_end - tp->mem_start + 1);
@@ -251,16 +251,56 @@ static ssize_t pwm_write(struct file *f, const char __user *buf, size_t count,
                            loff_t *off)
 {
   char buffer[count];
- 
+  char str[20],num[20];
+  unsigned int high;
   int i = 0;
+
   printk("writing enetered");
   i = copy_from_user(buffer, buf, count);
   buffer[count - 1] = '\0';
-  period = strToInt(buffer, count, 10);
-  if (period > 40000)
-  {
-    printk("maximum period exceeded, enter something less than 40000 ");
-    return count;
+  sscanf(buffer,"%s %s",str,num);
+  
+  if(strcmp(str,"pwm")==0){
+	printk("Its pwm guys");
+	if(!strcmp(num,"on")){
+		on = 1;
+		printk("Pwm is on :)");
+	}
+	else if(!strcmp(num,"off")){
+		on = 0;
+		printk("Pwm is off :(");
+	}
+	else{
+		printk("Incorrect on off input");
+		return count;
+	}    
+  }
+  else if(!strcmp(str,"period")){
+	
+	sscanf(num,"%u",&period);
+	high_time = (period*high);
+	printk("Yay we set the period");
+ 	if (period > 429496)
+  	{
+    		printk("maximum period exceeded, enter something less than 429496 ms ");
+    		return count;
+  	}	
+  }
+  else if(!strcmp(str,"duty")){
+	sscanf(num,"%u",&high);
+	if(high>100||high<0){
+		printk("Incorrect duty input");
+		return count;	
+	}
+	high_time = (period*high);
+	printk("Yay we set the duty");	
+  	printk("high is %u",high);
+	printk("high_time is %u",high_time);
+	printk("period is %u",period);
+  }
+  else{
+	printk("Incorrect first word");
+	return count;
   }
   setup_and_start_timer();
   
@@ -323,7 +363,7 @@ static void setup_and_start_timer()
   unsigned int zero = 0;
   unsigned int data;
  
-  timer_load = zero - period*100;
+  timer_load = zero - period*10000;
   ht_load = zero - high_time*100;
 
   data = ioread32(tp->base_addr + XIL_AXI_TIMER_TCSR0_OFFSET);
@@ -366,13 +406,15 @@ static void setup_and_start_timer()
   /* 
    * Start Timer
    */
+ 
+  if(on){
   data = ioread32(tp->base_addr + XIL_AXI_TIMER_TCSR0_OFFSET);
   iowrite32(data | XIL_AXI_TIMER_CSR_ENABLE_TMR_MASK,
 	    tp->base_addr + XIL_AXI_TIMER_TCSR0_OFFSET);
   data = ioread32(tp->base_addr + XIL_AXI_TIMER_TCSR1_OFFSET);
   iowrite32(data | XIL_AXI_TIMER_CSR_ENABLE_TMR_MASK,
 	    tp->base_addr + XIL_AXI_TIMER_TCSR1_OFFSET);
-
+  }
 
 }
 
