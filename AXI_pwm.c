@@ -70,7 +70,7 @@ static int pwm_remove(struct platform_device *pdev);
 
 static char chToUpper(char ch);
 static unsigned long strToInt(const char* pStr, int len, int base);
-static void setup_and_start_timer(unsigned int period, unsigned int high_time);
+static void setup_and_start_timer(void);
 
 //*********************GLOBAL VARIABLES*************************************
 static struct file_operations pwm_fops =
@@ -111,6 +111,7 @@ static struct cdev c_dev;
 static dev_t first;
 static struct class *cl;
 
+static unsigned int period, high_time;
 
 //***************************************************
 // INTERRUPT SERVICE ROUTINE (HANDLER)
@@ -195,7 +196,9 @@ static int pwm_probe(struct platform_device *pdev)
   }
   // starting pwm, default tick is 1s and 50% high time 
 
-  setup_and_start_timer(1000000,500000);
+  period = 1000000;
+  high_time = 500000;
+  setup_and_start_timer();
   printk("probing done");
  error2:
   release_mem_region(tp->mem_start, tp->mem_end - tp->mem_start + 1);
@@ -241,13 +244,14 @@ static int pwm_close(struct inode *i, struct file *f)
 static ssize_t pwm_read(struct file *f, char __user *buf, size_t len, loff_t *off)
 {
     printk("reding entered");
+    printk("Period of pwm is %u us, and the duty cycle is %u%%",period,100*high_time/period);
     return 0;
 }
 static ssize_t pwm_write(struct file *f, const char __user *buf, size_t count,
                            loff_t *off)
 {
   char buffer[count];
-  unsigned int period, high_time;
+ 
   int i = 0;
   printk("writing enetered");
   i = copy_from_user(buffer, buf, count);
@@ -258,7 +262,7 @@ static ssize_t pwm_write(struct file *f, const char __user *buf, size_t count,
     printk("maximum period exceeded, enter something less than 40000 ");
     return count;
   }
-  setup_and_start_timer(period,high_time);
+  setup_and_start_timer();
   
   
   return count;
@@ -310,7 +314,7 @@ static unsigned long strToInt(const char* pStr, int len, int base)
 //HELPER FUNCTION THAT RESETS AND STARTS TIMER WITH PERIOD IN MILISECONDS
 
 
-static void setup_and_start_timer(unsigned int period, unsigned int high_time)
+static void setup_and_start_timer()
 {
   /* 
    * disable Timer Counter
