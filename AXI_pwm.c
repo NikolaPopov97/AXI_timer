@@ -114,23 +114,23 @@ static struct class *cl;
 
 //***************************************************
 // INTERRUPT SERVICE ROUTINE (HANDLER)
-/*
+
 static irqreturn_t xilaxitimer_isr(int irq,void*dev_id)		
 {      
-  unsigned int data;
+//  unsigned int data;
   
   /* 
    * Check Timer Counter Value
    */
-  data = ioread32(tp->base_addr + XIL_AXI_TIMER_TCR_OFFSET);
-  printk("xilaxitimer_isr: Interrupt Occurred ! Timer Count = 0x%08X\n",data);
+ // data = ioread32(tp->base_addr + XIL_AXI_TIMER_TCR_OFFSET);
+  //printk("xilaxitimer_isr: Interrupt Occurred ! Timer Count = 0x%08X\n",data);
   
   /* 
    * Clear Interrupt
    */
-  data = ioread32(tp->base_addr + XIL_AXI_TIMER_TCSR_OFFSET);
-  iowrite32(data | XIL_AXI_TIMER_CSR_INT_OCCURED_MASK,
-	    tp->base_addr + XIL_AXI_TIMER_TCSR_OFFSET);
+  //data = ioread32(tp->base_addr + XIL_AXI_TIMER_TCSR_OFFSET);
+ // iowrite32(data | XIL_AXI_TIMER_CSR_INT_OCCURED_MASK,
+//	    tp->base_addr + XIL_AXI_TIMER_TCSR_OFFSET);
   
   /* 
    * Disable Timer after 100 Interrupts
@@ -138,7 +138,7 @@ static irqreturn_t xilaxitimer_isr(int irq,void*dev_id)
 
   return IRQ_HANDLED;
 }
-*/
+
 //***************************************************
 // PROBE AND REMOVE
 
@@ -204,7 +204,7 @@ static int pwm_probe(struct platform_device *pdev)
   
 }
 
-static int timer_remove(struct platform_device *pdev)
+static int pwm_remove(struct platform_device *pdev)
 {
   unsigned int data;
     /* 
@@ -252,8 +252,8 @@ static ssize_t pwm_write(struct file *f, const char __user *buf, size_t count,
   printk("writing enetered");
   i = copy_from_user(buffer, buf, count);
   buffer[count - 1] = '\0';
-  timer_ms = strToInt(buffer, count, 10);
-  if (timer_ms > 40000)
+  period = strToInt(buffer, count, 10);
+  if (period > 40000)
   {
     printk("maximum period exceeded, enter something less than 40000 ");
     return count;
@@ -335,11 +335,11 @@ static void setup_and_start_timer(unsigned int period, unsigned int high_time)
    * Set Timer Counter
    */
 
-  iowrite32(pwm_load, tp->base_addr + XIL_AXI_TIMER_TLR0_OFFSET);
+  iowrite32(timer_load, tp->base_addr + XIL_AXI_TIMER_TLR0_OFFSET);
   data = ioread32(tp->base_addr + XIL_AXI_TIMER_TLR0_OFFSET);
   printk("xilaxitimer_init: Set period 0x%08X\n",data);
  
-  iowrite32(pwm_load, tp->base_addr + XIL_AXI_TIMER_TLR1_OFFSET);
+  iowrite32(ht_load, tp->base_addr + XIL_AXI_TIMER_TLR1_OFFSET);
   data = ioread32(tp->base_addr + XIL_AXI_TIMER_TLR1_OFFSET);
   printk("xilaxitimer_init: Set high time 0x%08X\n",data);
   
@@ -378,7 +378,7 @@ static void setup_and_start_timer(unsigned int period, unsigned int high_time)
 static int __init pwm_init(void)
 {
   
-  int_cnt = 0;
+  //int_cnt = 0;
   
   printk(KERN_INFO "xilaxitimer_init: Initialize Module \"%s\"\n", DEVICE_NAME);
 
