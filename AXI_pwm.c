@@ -280,16 +280,16 @@ static ssize_t pwm_write(struct file *f, const char __user *buf, size_t count,
 	sscanf(num,"%u",&period);
 	high_time = (period*high);
 	printk("Yay we set the period");
- 	if (period > 429496)
+ 	if (period > 4294967295U)
   	{
-    		printk("maximum period exceeded, enter something less than 429496 ms ");
+    		printk("Maximum period exceeded, enter a value less than 42949672950 ns ");
     		return count;
   	}	
   }
   else if(!strcmp(str,"duty")){
 	sscanf(num,"%u",&high);
 	if(high>100||high<0){
-		printk("Incorrect duty input");
+		printk("Incorrect input for duty cycle");
 		return count;	
 	}
 	high_time = (period*high);
@@ -363,8 +363,8 @@ static void setup_and_start_timer()
   unsigned int zero = 0;
   unsigned int data;
  
-  timer_load = zero - period*10000;
-  ht_load = zero - high_time*100;
+  timer_load = zero - period;
+  ht_load = zero - high_time;
 
   data = ioread32(tp->base_addr + XIL_AXI_TIMER_TCSR0_OFFSET);
   iowrite32(data & ~(XIL_AXI_TIMER_CSR_ENABLE_TMR_MASK),
