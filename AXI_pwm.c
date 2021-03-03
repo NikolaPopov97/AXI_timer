@@ -422,7 +422,7 @@ static int __init pwm_init(void)
 
 } 
 
-static void __exit timer_exit(void)  		
+static void __exit pwm_exit(void)  		
 {
 
   platform_driver_unregister(&pwm_driver);
@@ -435,8 +435,8 @@ static void __exit timer_exit(void)
   printk(KERN_INFO "xilaxitimer_exit: Exit Device Module \"%s\".\n", DEVICE_NAME);
 }
 
-module_init(timer_init);
-module_exit(timer_exit);
+module_init(pwm_init);
+module_exit(pwm_exit);
 
 MODULE_AUTHOR ("Xilinx");
 MODULE_DESCRIPTION("Test Driver for Zynq PL AXI Timer.");
