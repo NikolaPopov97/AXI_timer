@@ -244,7 +244,7 @@ static int pwm_close(struct inode *i, struct file *f)
 static ssize_t pwm_read(struct file *f, char __user *buf, size_t len, loff_t *off)
 {
     printk("reding entered");
-    printk("Period of pwm is %u us, and the duty cycle is %u%%",period,100*high_time/period);
+    printk("Period of pwm is %u us, and the duty cycle is %u%%",period,high_time);
     return 0;
 }
 static ssize_t pwm_write(struct file *f, const char __user *buf, size_t count,
@@ -252,10 +252,10 @@ static ssize_t pwm_write(struct file *f, const char __user *buf, size_t count,
 {
   char buffer[count];
   char str[20],num[20];
-  unsigned int high;
+  static unsigned int high;
   int i = 0;
 
-  printk("writing enetered");
+  printk("writing entered");
   i = copy_from_user(buffer, buf, count);
   buffer[count - 1] = '\0';
   sscanf(buffer,"%s %s",str,num);
@@ -287,14 +287,13 @@ static ssize_t pwm_write(struct file *f, const char __user *buf, size_t count,
   	}	
   }
   else if(!strcmp(str,"duty")){
-	sscanf(num,"%u",&high);
-	if(high>100||high<0){
+	sscanf(num,"%u",&high_time);
+	if(high_time>100||high_time<0){
 		printk("Incorrect input for duty cycle");
 		return count;	
 	}
-	high_time = (period*high);
+	
 	printk("Yay we set the duty");	
-  	printk("high is %u",high);
 	printk("high_time is %u",high_time);
 	printk("period is %u",period);
   }
@@ -359,12 +358,19 @@ static void setup_and_start_timer()
   /* 
    * disable Timer Counter
    */
-  unsigned int timer_load,ht_load;
+  unsigned int timer_load,ht_load, carry;
   unsigned int zero = 0;
   unsigned int data;
- 
+  
+  //Calculating values for TLR0 and TLR1 
+
+  if(((period%100)*high_time >= 50)&&((period%100)*high_time < 100))
+	carry = 1;
+  else 
+	carry = 0;
+
   timer_load = zero - period;
-  ht_load = zero - high_time;
+  ht_load = zero - (period/100)*high_time - ((period%100)*high_time/100) - carry; 
 
   data = ioread32(tp->base_addr + XIL_AXI_TIMER_TCSR0_OFFSET);
   iowrite32(data & ~(XIL_AXI_TIMER_CSR_ENABLE_TMR_MASK),
@@ -455,9 +461,10 @@ static int __init pwm_init(void)
   }
 
   printk(KERN_INFO "Device init.\n");
-
+  
+  
   return platform_driver_register(&pwm_driver);
-
+  
  fail_2:
   device_destroy(cl, MKDEV(MAJOR(first),0));
  fail_1:
