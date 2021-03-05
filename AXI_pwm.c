@@ -20,6 +20,7 @@
 #include <linux/cdev.h>
 #include <linux/uaccess.h>
 
+
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("pwm driver");
 #define DEVICE_NAME "pwm"
@@ -55,6 +56,7 @@ MODULE_DESCRIPTION("pwm driver");
 #define XIL_AXI_TIMER_CSR_DOWN_COUNT_MASK	0x00000002
 #define XIL_AXI_TIMER_CSR_CAPTURE_MODE_MASK	0x00000001
 
+#define MAX_COUNT 4294967295ULL 
 //#define TIMER_CNT	0xF8000000
 //*************************************************************************
 static int pwm_probe(struct platform_device *pdev);
@@ -252,11 +254,16 @@ static ssize_t pwm_write(struct file *f, const char __user *buf, size_t count,
 {
   char buffer[count];
   char str[20],num[20];
-  static unsigned int high;
-  int i = 0;
+  int i;	
+  for(i = 0;i<20;i++){
+	num[i]=0;
+  }
+
+  unsigned long long check;
+  
 
   printk("writing entered");
-  i = copy_from_user(buffer, buf, count);
+  copy_from_user(buffer, buf, count);
   buffer[count - 1] = '\0';
   sscanf(buffer,"%s %s",str,num);
   
@@ -277,14 +284,16 @@ static ssize_t pwm_write(struct file *f, const char __user *buf, size_t count,
   }
   else if(!strcmp(str,"period")){
 	
-	sscanf(num,"%u",&period);
-	high_time = (period*high);
-	printk("Yay we set the period");
- 	if (period > 4294967295U)
+	sscanf(num,"%llu",&check);
+	printk("Check is %llu",check);
+ 	if (check > MAX_COUNT)
   	{
-    		printk("Maximum period exceeded, enter a value less than 42949672950 ns ");
+    		printk("Maximum period exceeded, enter a value less than 4294967295 ");
     		return count;
-  	}	
+  	}
+
+	sscanf(num,"%u",&period);
+	printk("Yay we set the period");
   }
   else if(!strcmp(str,"duty")){
 	sscanf(num,"%u",&high_time);
@@ -292,10 +301,11 @@ static ssize_t pwm_write(struct file *f, const char __user *buf, size_t count,
 		printk("Incorrect input for duty cycle");
 		return count;	
 	}
-	
+       	
 	printk("Yay we set the duty");	
 	printk("high_time is %u",high_time);
 	printk("period is %u",period);
+  	
   }
   else{
 	printk("Incorrect first word");
@@ -358,19 +368,15 @@ static void setup_and_start_timer()
   /* 
    * disable Timer Counter
    */
-  unsigned int timer_load,ht_load, carry;
+  unsigned int timer_load,ht_load;
   unsigned int zero = 0;
   unsigned int data;
   
   //Calculating values for TLR0 and TLR1 
 
-  if(((period%100)*high_time >= 50)&&((period%100)*high_time < 100))
-	carry = 1;
-  else 
-	carry = 0;
 
   timer_load = zero - period;
-  ht_load = zero - (period/100)*high_time - ((period%100)*high_time/100) - carry; 
+  ht_load = zero - (period/100)*high_time - ((period%100)*high_time/100) - 1; 
 
   data = ioread32(tp->base_addr + XIL_AXI_TIMER_TCSR0_OFFSET);
   iowrite32(data & ~(XIL_AXI_TIMER_CSR_ENABLE_TMR_MASK),
@@ -382,7 +388,7 @@ static void setup_and_start_timer()
 
 
    /* 
-   * Set Timer Counter
+   * Set Timer Counters
    */
 
   iowrite32(timer_load, tp->base_addr + XIL_AXI_TIMER_TLR0_OFFSET);
@@ -401,11 +407,11 @@ static void setup_and_start_timer()
   iowrite32(XIL_AXI_TIMER_CSR_LOAD_MASK,
 	    tp->base_addr + XIL_AXI_TIMER_TCSR1_OFFSET);
 
-  iowrite32(XIL_AXI_TIMER_CSR_EXT_GENERATE_MASK | XIL_AXI_TIMER_CSR_AUTO_RELOAD_MASK | 
-	     XIL_AXI_TIMER_CSR_ENABLE_PWM_MASK,
+  iowrite32(XIL_AXI_TIMER_CSR_EXT_GENERATE_MASK | XIL_AXI_TIMER_CSR_ENABLE_PWM_MASK &
+		 ~(XIL_AXI_TIMER_CSR_CAPTURE_MODE_MASK),
 	    tp->base_addr + XIL_AXI_TIMER_TCSR0_OFFSET);
-  iowrite32(XIL_AXI_TIMER_CSR_EXT_GENERATE_MASK | XIL_AXI_TIMER_CSR_AUTO_RELOAD_MASK | 
-	     XIL_AXI_TIMER_CSR_ENABLE_PWM_MASK,
+  iowrite32(XIL_AXI_TIMER_CSR_EXT_GENERATE_MASK | XIL_AXI_TIMER_CSR_ENABLE_PWM_MASK &
+		 ~(XIL_AXI_TIMER_CSR_CAPTURE_MODE_MASK),
 	    tp->base_addr + XIL_AXI_TIMER_TCSR1_OFFSET);
 
 
