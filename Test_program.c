@@ -5,10 +5,10 @@
 
 
 int main(){
-	FILE *faxi,*fs;
-	int duty = 0, increment = 0;
-	char sval[4] = {0,0,0,0};
-	char *str;
+	FILE *faxi,*fs,*fb;
+	int duty = 0, increment = 0, power;
+	char sval[4] = {0,0,0,0}, bval[2] = {0,0};
+	char *str,*str1;
 	size_t num_of_bytes = 6;	
 	 
 	
@@ -30,7 +30,7 @@ int main(){
 
 
 	
-	//while(1){
+	while(1){
 		
 		/*
 		*
@@ -51,6 +51,12 @@ int main(){
 			puts("Error while closing switch\n");
 			return -1;
 		}
+		//Give copy values and check for on off change
+		if(sval[0]==(str[2]-48))
+			power = 0;
+		else
+			power = 1;
+		
 		sval[0] = str[2] - 48;	
 		sval[1] = str[3] - 48;		
 		sval[2] = str[4] - 48;
@@ -64,7 +70,64 @@ int main(){
 		*Increment 
 		*
 		*/
-					
+		
+		
+		if(sval[0]){
+			if(sval[2]){
+				if (sval[3])
+					increment = 7;
+				else
+					increment = 6
+			}
+			else{
+				if (sval[3])
+					increment = 5;
+				else
+					increment = 4
+			}
+		}
+		else
+		{
+			if(sval[2]){
+				if (sval[3])
+					increment = 3;
+				else
+					increment = 2
+			}
+			else{
+				if (sval[3])
+					increment = 1;
+				else
+					increment = 0
+			}
+		}
+		
+		/*
+		*
+		*Buttons and duty cycle calculation
+		*
+		*/
+		
+		fb = fopen("/dev/button","r");
+		if(fb==NULL)
+		{
+			puts("Error while opening button file");
+			return -1;
+		}
+		
+		str1 = (char *)malloc(num_of_bytes+1);
+		getline(&str1,&num_of_bytes,fb);
+		
+		if(fclose(fb)){
+			puts("Error while closing button file");
+			return -1;
+		}
+		
+		
+		bval[0] = str[4] - 48;
+		bval[1] = str[5] - 48;
+		free(str1);
+		
 		
 		
 		/*
@@ -73,7 +136,7 @@ int main(){
 		*
 		*/
 		
-		
+			
 		faxi = fopen("/dev/pwm", "w");
 		if(faxi == NULL){
 			printf("Error while opening pwm file\n");
@@ -90,24 +153,24 @@ int main(){
 		
 
 
-
-		faxi = fopen("/dev/pwm", "w");
-		if(faxi == NULL){
-			printf("Error while opening pwm file\n");
-			return -1;
-		}
+		if(power){
+			faxi = fopen("/dev/pwm", "w");
+			if(faxi == NULL){
+				printf("Error while opening pwm file\n");
+				return -1;
+			}
 		
-		///Turn on off pwm
-		if(sval[0])
-			fputs("pwm on\n",faxi);
-		else
-			fpust("pwm off\n",faxi);
+			///Turn on off pwm
+			if(sval[0])
+				fputs("pwm on\n",faxi);
+			else
+				fputs("pwm off\n",faxi);
 
-		if(fclose(faxi)){
-			printf("Error while closing pwm file\n");
-			return -1;
+			if(fclose(faxi)){
+				printf("Error while closing pwm file\n");
+				return -1;
+			}
 		}
-		
-	//}
+	}
 	return 0;
 }
