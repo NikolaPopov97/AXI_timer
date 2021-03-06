@@ -246,7 +246,7 @@ static int pwm_close(struct inode *i, struct file *f)
 static ssize_t pwm_read(struct file *f, char __user *buf, size_t len, loff_t *off)
 {
     printk("reding entered");
-    printk("Period of pwm is %u us, and the duty cycle is %u%%",period,high_time);
+    printk("Period of pwm is %u00 ns, and the duty cycle is %u%%",period,high_time);
     return 0;
 }
 static ssize_t pwm_write(struct file *f, const char __user *buf, size_t count,
