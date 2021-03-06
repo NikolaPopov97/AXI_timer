@@ -175,6 +175,7 @@ int main(){
 				printf("Error while closing pwm file\n");
 				return -1;
 			}
+			printf("Duty value is %d\n",duty);
 		}
 
 
@@ -195,6 +196,7 @@ int main(){
 				printf("Error while closing pwm file\n");
 				return -1;
 			}
+			printf("Power value is %d\n",power);
 		}
 	}
 	return 0;
