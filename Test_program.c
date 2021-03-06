@@ -6,7 +6,7 @@
 
 int main(){
 	FILE *faxi,*fs,*fb;
-	int duty = 0, increment = 0, power;
+	int duty = 0, increment = 0, power,button;
 	char sval[4] = {0,0,0,0}, bval[2] = {0,0};
 	char *str,*str1;
 	size_t num_of_bytes = 6;	
@@ -123,34 +123,59 @@ int main(){
 			return -1;
 		}
 		
+		if((bval[0]==(str[4]-48))&&(bval[1]==(str[5]-48)))
+			button = 0;
+		else
+			button = 1;
 		
 		bval[0] = str[4] - 48;
 		bval[1] = str[5] - 48;
 		free(str1);
 		
-		
-		
+		if(bval[0]&&button){
+			
+			if((duty+increment)<100)
+				duty+=increment;
+			else{
+				printf("Duty cycle is 100%%\n");
+				duty = 100;
+			}
+		}
+		else if(bval[1]&&button){
+			
+			if((duty-increment)<0)
+				duty-=increment;
+			else{
+				printf("Duty cycle is 0%%\n");
+				duty = 100;
+		}
+		else{}
+			
+			
 		/*
 		*
 		* Pwm control
 		*
 		*/
 		
+		
 			
-		faxi = fopen("/dev/pwm", "w");
-		if(faxi == NULL){
-			printf("Error while opening pwm file\n");
-			return -1;
-		}
+		if(button && (bval[0] || bval[1]))
+		{
+			faxi = fopen("/dev/pwm", "w");
+			if(faxi == NULL){
+				printf("Error while opening pwm file\n");
+				return -1;
+			}	
 		
-		//Pass the duty cycle value
-		fprintf(faxi,"duty %d\n",duty);
+			//Pass the duty cycle value
+			fprintf(faxi,"duty %d\n",duty);
 				
-		if(fclose(faxi)){
-			printf("Error while closing pwm file\n");
-			return -1;
+			if(fclose(faxi)){
+				printf("Error while closing pwm file\n");
+				return -1;
+			}
 		}
-		
 
 
 		if(power){
