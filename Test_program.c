@@ -122,7 +122,7 @@ int main(){
 			puts("Error while closing button file");
 			return -1;
 		}
-		
+		//Check to see state change 
 		if((bval[0]==(str[4]-48))&&(bval[1]==(str[5]-48)))
 			button = 0;
 		else
@@ -137,7 +137,7 @@ int main(){
 			if((duty+increment)<=100)
 				duty+=increment;
 			else{
-				printf("Duty cycle is 100%%\n");
+				printf("Cant increment anymore, duty cycle is 100%% \n");
 				duty = 100;
 			}
 		}
@@ -146,7 +146,7 @@ int main(){
 			if((duty-increment)>=0)
 				duty-=increment;
 			else{
-				printf("Duty cycle is 0%%\n");
+				printf("Cant decrement anymore, duty cycle is 0%%\n");
 				duty = 0;
 			}
 		}
@@ -176,8 +176,8 @@ int main(){
 				printf("Error while closing pwm file\n");
 				return -1;
 			}
-			printf("Duty value is %d\n",duty);
-			printf("Increment value is %d\n",increment);
+			//printf("Duty value is %d\n",duty);
+			//printf("Increment value is %d\n",increment);
 		}
 
 
