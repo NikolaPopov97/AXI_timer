@@ -63,7 +63,7 @@ int main(){
 		sval[3] = str[5] - 48;
 
 		free(str);
-		printf("Switch values %d %d %d %d",sval[0],sval[1],sval[2],sval[3]);
+	
 
 		/*
 		*
@@ -72,18 +72,18 @@ int main(){
 		*/
 		
 		
-		if(sval[0]){
+		if(sval[1]){
 			if(sval[2]){
 				if (sval[3])
 					increment = 7;
 				else
-					increment = 6
+					increment = 6;
 			}
 			else{
 				if (sval[3])
 					increment = 5;
 				else
-					increment = 4
+					increment = 4;
 			}
 		}
 		else
@@ -92,13 +92,13 @@ int main(){
 				if (sval[3])
 					increment = 3;
 				else
-					increment = 2
+					increment = 2;
 			}
 			else{
 				if (sval[3])
 					increment = 1;
 				else
-					increment = 0
+					increment = 0;
 			}
 		}
 		
@@ -134,7 +134,7 @@ int main(){
 		
 		if(bval[0]&&button){
 			
-			if((duty+increment)<100)
+			if((duty+increment)<=100)
 				duty+=increment;
 			else{
 				printf("Duty cycle is 100%%\n");
@@ -143,11 +143,12 @@ int main(){
 		}
 		else if(bval[1]&&button){
 			
-			if((duty-increment)<0)
+			if((duty-increment)>=0)
 				duty-=increment;
 			else{
 				printf("Duty cycle is 0%%\n");
-				duty = 100;
+				duty = 0;
+			}
 		}
 		else{}
 			
@@ -176,6 +177,7 @@ int main(){
 				return -1;
 			}
 			printf("Duty value is %d\n",duty);
+			printf("Increment value is %d\n",increment);
 		}
 
 
